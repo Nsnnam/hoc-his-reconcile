@@ -21,6 +21,18 @@ Trong quy trình liên thông dữ liệu Khám Sức Khỏe theo **Thông tư 3
 
 ---
 
+## 🔗 03 Đường Link Nhanh Xuất File Đầu Vào
+
+Hệ thống tích hợp sẵn các đường link trực tiếp trên thanh điều hướng (Navbar) và giao diện tải file để mở ngay các màn hình xuất dữ liệu:
+
+| Hệ thống | Chức năng | Đường link trực tiếp | Định dạng file xuất ra |
+| :--- | :--- | :--- | :--- |
+| **Cổng HOC** | Tra cứu tiếp nhận cổng 1551 | [moc.congdulieuyte.vn/.../tra-cuu-tiep-nhan-1551](https://moc.congdulieuyte.vn/hoc/tra-cuu/tra-cuu-tiep-nhan-1551) | `.xlsx` (Có Transaction ID, Trạng thái, Lỗi JSON) |
+| **HIS Bệnh viện** | Xuất đăng ký tiếp nhận | [bvlacviet.vncare.vn/.../NGT01T001_tiepnhan_ngt](https://bvlacviet.vncare.vn/vnpthis/main/manager.jsp?func=../ngoaitru/NGT01T001_tiepnhan_ngt) | `.xls` (Có Nơi làm việc / Cty, SĐT, Khoa phòng) |
+| **HIS Bệnh viện** | Quản lý hồ sơ KSK | [bvlacviet.vncare.vn/.../NTU_QuanLyHS_KSK](https://bvlacviet.vncare.vn/vnpthis/main/manager.jsp?func=../noitru/NTU_QuanLyHS_KSK) | `.xls` (Có Mã giao dịch HIS, Người gửi, Ngày gửi) |
+
+---
+
 ## ✨ Tính Năng Nổi Bật
 
 ### 1. Nạp Nhiều File Excel & Đối Chiếu Lũy Kế Liên Tục

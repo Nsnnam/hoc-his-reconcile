@@ -108,3 +108,52 @@ export interface FilterCriteria {
   tuNgayKham: string;
   denNgayKham: string;
 }
+
+export interface PortalLink {
+  id: string;
+  title: string;
+  shortTitle: string;
+  url: string;
+  description: string;
+  fileType: string;
+  sourceType: 'HOC' | 'HIS_RECEPTION' | 'HIS_EXPORT';
+  badge: string;
+  badgeColor: string;
+}
+
+export const EXTERNAL_PORTAL_LINKS: PortalLink[] = [
+  {
+    id: 'hoc_1551',
+    title: 'Cổng Tra Cứu HOC 1551',
+    shortTitle: 'Cổng HOC (1551)',
+    url: 'https://moc.congdulieuyte.vn/hoc/tra-cuu/tra-cuu-tiep-nhan-1551',
+    description: 'Tra cứu danh sách tiếp nhận và kết quả hồ sơ KSK 1551 từ Bộ Y Tế',
+    fileType: 'File HOC Tiếp nhận 1551 (.xlsx)',
+    sourceType: 'HOC',
+    badge: 'Cổng HOC',
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200'
+  },
+  {
+    id: 'his_reception',
+    title: 'Xuất Đăng Ký Tiếp Nhận',
+    shortTitle: 'Đăng Ký Tiếp Nhận (HIS)',
+    url: 'https://bvlacviet.vncare.vn/vnpthis/main/manager.jsp?func=../ngoaitru/NGT01T001_tiepnhan_ngt',
+    description: 'Xuất danh sách tiếp nhận người bệnh có Nơi làm việc (Cty), SĐT, Khoa phòng',
+    fileType: 'File HIS Tiếp nhận & Cty (.xls)',
+    sourceType: 'HIS_RECEPTION',
+    badge: 'HIS Tiếp Nhận',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200'
+  },
+  {
+    id: 'his_ksk',
+    title: 'Quản Lý Hồ Sơ KSK',
+    shortTitle: 'Quản Lý KSK (HIS)',
+    url: 'https://bvlacviet.vncare.vn/vnpthis/main/manager.jsp?func=../noitru/NTU_QuanLyHS_KSK',
+    description: 'Quản lý và xuất danh sách hồ sơ khám sức khỏe đẩy liên thông cổng, có Mã giao dịch',
+    fileType: 'File HIS Đẩy hồ sơ KSK (.xls)',
+    sourceType: 'HIS_EXPORT',
+    badge: 'HIS Giám Sát KSK',
+    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200'
+  }
+];
+

@@ -455,13 +455,53 @@ export function App() {
       />
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-12">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div>
-            <strong>HOC - HIS Reconcile Pro</strong> • Giám sát & Đối chiếu liên thông hồ sơ khám sức khỏe
+      <footer className="bg-white border-t border-slate-200 py-6 text-xs text-slate-500 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+          {/* Quick links row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div className="font-semibold text-slate-700">
+              🔗 Cổng xuất file đầu vào:
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href="https://moc.congdulieuyte.vn/hoc/tra-cuu/tra-cuu-tiep-nhan-1551"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-purple-600 hover:underline flex items-center gap-1 text-slate-600"
+              >
+                <span>Cổng HOC (1551)</span>
+                <span className="text-[10px]">↗</span>
+              </a>
+              <span className="text-slate-300">•</span>
+              <a
+                href="https://bvlacviet.vncare.vn/vnpthis/main/manager.jsp?func=../ngoaitru/NGT01T001_tiepnhan_ngt"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-emerald-600 hover:underline flex items-center gap-1 text-slate-600"
+              >
+                <span>Xuất đăng ký tiếp nhận (HIS)</span>
+                <span className="text-[10px]">↗</span>
+              </a>
+              <span className="text-slate-300">•</span>
+              <a
+                href="https://bvlacviet.vncare.vn/vnpthis/main/manager.jsp?func=../noitru/NTU_QuanLyHS_KSK"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-blue-600 hover:underline flex items-center gap-1 text-slate-600"
+              >
+                <span>Quản lý hồ sơ KSK (HIS)</span>
+                <span className="text-[10px]">↗</span>
+              </a>
+            </div>
           </div>
-          <div className="text-slate-400">
-            Xử lý an toàn 100% trong trình duyệt • Không gửi dữ liệu bệnh nhân ra ngoài
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+              <strong>HOC - HIS Reconcile Pro</strong> • Giám sát & Đối chiếu liên thông hồ sơ khám sức khỏe
+            </div>
+            <div className="text-slate-400">
+              Xử lý an toàn 100% trong trình duyệt • Không gửi dữ liệu bệnh nhân ra ngoài
+            </div>
           </div>
         </div>
       </footer>
