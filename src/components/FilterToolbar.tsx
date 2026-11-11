@@ -6,9 +6,12 @@ import {
   Building2, 
   ShieldAlert, 
   Calendar,
+  Clock,
+  Sparkles,
   X
 } from 'lucide-react';
 import { FilterCriteria, WorkplaceStat, ErrorGroupStat } from '../types';
+import { toInputDateValue, fromInputDateValue } from '../utils/fileParser';
 
 interface FilterToolbarProps {
   filters: FilterCriteria;
@@ -19,6 +22,53 @@ interface FilterToolbarProps {
   totalRecords: number;
   filteredCount: number;
 }
+
+interface DatePickerFieldProps {
+  value: string;
+  onChange: (val: string) => void;
+  accent: 'emerald' | 'purple';
+  title?: string;
+  placeholder?: string;
+}
+
+const DatePickerField: React.FC<DatePickerFieldProps> = ({ value, onChange, accent, title, placeholder }) => {
+  const inputVal = toInputDateValue(value);
+  const ringColor = accent === 'emerald' 
+    ? 'focus-within:ring-emerald-500 focus-within:border-emerald-500' 
+    : 'focus-within:ring-purple-500 focus-within:border-purple-500';
+
+  return (
+    <div 
+      className={`inline-flex items-center space-x-1 bg-white border border-slate-300 rounded px-1.5 py-0.5 hover:border-slate-400 shadow-2xs transition-all ${ringColor} focus-within:outline-none focus-within:ring-1`}
+      title={title || (value ? `Đã chọn: ${value} (Bấm để đổi ngày)` : 'Bấm để mở lịch chọn ngày')}
+    >
+      <input
+        type="date"
+        value={inputVal}
+        onChange={(e) => onChange(fromInputDateValue(e.target.value))}
+        onClick={(e) => {
+          try {
+            (e.target as any).showPicker?.();
+          } catch {}
+        }}
+        className="text-[11px] bg-transparent text-slate-700 font-mono cursor-pointer focus:outline-none w-[116px]"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange('');
+          }}
+          className="text-slate-400 hover:text-rose-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+          title="Xóa ngày này"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const FilterToolbar: React.FC<FilterToolbarProps> = ({
   filters,
@@ -37,10 +87,44 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
     Boolean(filters.tuNgayKham) ||
     Boolean(filters.denNgayKham) ||
     Boolean(filters.tuNgayDayHOC) ||
-    Boolean(filters.denNgayDayHOC);
+    Boolean(filters.denNgayDayHOC) ||
+    !filters.chiLayHoSoHIS;
 
   return (
     <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+      {/* Nút tích Bộ lọc Ưu tiên rà soát hồ sơ theo tệp HIS (Mặc định: BẬT) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-gradient-to-r from-sky-50/90 via-blue-50/60 to-indigo-50/60 p-2.5 rounded-lg border border-sky-200/80 text-xs">
+        <label className="flex items-start sm:items-center space-x-2.5 cursor-pointer select-none flex-1">
+          <input
+            type="checkbox"
+            checked={filters.chiLayHoSoHIS}
+            onChange={(e) => onFilterChange({ chiLayHoSoHIS: e.target.checked })}
+            className="w-4 h-4 mt-0.5 sm:mt-0 text-sky-600 rounded border-slate-300 focus:ring-sky-500 cursor-pointer accent-sky-600 shrink-0"
+          />
+          <div className="flex flex-col">
+            <div className="flex items-center flex-wrap gap-1.5 font-bold text-sky-950">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>Chỉ rà soát hồ sơ thuộc tệp HIS (Khớp mã giao dịch cột K & Chưa đẩy HOC)</span>
+              <span className="text-[10px] bg-sky-200/80 text-sky-800 px-1.5 py-0.2 rounded font-semibold">
+                Mặc định BẬT
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Tự động lấy hồ sơ chưa đẩy HOC và hồ sơ đã đẩy có Transaction ID trùng khớp với cột K trong tệp xuất HIS; bỏ qua các Transaction ID dư trên HOC (bỏ tích nếu muốn xem toàn bộ).
+            </p>
+          </div>
+        </label>
+        <div className="shrink-0 self-end sm:self-center">
+          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+            filters.chiLayHoSoHIS 
+              ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+              : 'bg-amber-100 text-amber-800 border-amber-300'
+          }`}>
+            {filters.chiLayHoSoHIS ? '✓ Đang lọc tệp HIS' : '⚠ Đang hiện cả HOC dư'}
+          </span>
+        </div>
+      </div>
+
       {/* Search & Main Row */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
         {/* Global Search Bar */}
@@ -95,7 +179,9 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             <option value="MATCH_FAILED">❌ HOC Thất bại / Lỗi</option>
             <option value="HIS_NO_TRANS">⏳ Chưa có mã GD HIS</option>
             <option value="HIS_TRANS_NOT_IN_HOC">⚠️ Đã gửi, chờ HOC</option>
-            <option value="HOC_ONLY">📋 Chỉ có trên HOC</option>
+            {!filters.chiLayHoSoHIS && (
+              <option value="HOC_ONLY">📋 Chỉ có trên HOC (Dư / Không khớp HIS)</option>
+            )}
           </select>
         </div>
 
@@ -121,50 +207,46 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
         {/* Date Filter & Active Filter Tags */}
         <div className="flex flex-wrap items-center gap-3">
           {/* HIS Date */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-slate-600 flex items-center gap-1 font-semibold text-[11px]">
+          <div className="flex items-center space-x-1.5 bg-emerald-50/60 py-1 px-2 rounded-lg border border-emerald-100">
+            <span className="text-emerald-800 flex items-center gap-1 font-semibold text-[11px]">
               <Calendar className="w-3.5 h-3.5 text-emerald-600" />
               <span>Tiếp nhận (HIS):</span>
             </span>
-            <input
-              type="text"
-              placeholder="dd/mm/yyyy"
+            <DatePickerField
               value={filters.tuNgayKham}
-              onChange={(e) => onFilterChange({ tuNgayKham: e.target.value })}
-              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+              onChange={(val) => onFilterChange({ tuNgayKham: val })}
+              accent="emerald"
+              title="Chọn từ ngày tiếp nhận khám"
             />
-            <span className="text-slate-400">-</span>
-            <input
-              type="text"
-              placeholder="dd/mm/yyyy"
+            <span className="text-slate-400 font-bold">-</span>
+            <DatePickerField
               value={filters.denNgayKham}
-              onChange={(e) => onFilterChange({ denNgayKham: e.target.value })}
-              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+              onChange={(val) => onFilterChange({ denNgayKham: val })}
+              accent="emerald"
+              title="Chọn đến ngày tiếp nhận khám"
             />
           </div>
 
           <span className="text-slate-300 hidden sm:inline">|</span>
 
           {/* HOC Push Date */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-slate-600 flex items-center gap-1 font-semibold text-[11px]">
-              <Calendar className="w-3.5 h-3.5 text-purple-600" />
+          <div className="flex items-center space-x-1.5 bg-purple-50/60 py-1 px-2 rounded-lg border border-purple-100">
+            <span className="text-purple-800 flex items-center gap-1 font-semibold text-[11px]">
+              <Clock className="w-3.5 h-3.5 text-purple-600" />
               <span>Đẩy cổng (HOC):</span>
             </span>
-            <input
-              type="text"
-              placeholder="dd/mm/yyyy"
+            <DatePickerField
               value={filters.tuNgayDayHOC}
-              onChange={(e) => onFilterChange({ tuNgayDayHOC: e.target.value })}
-              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+              onChange={(val) => onFilterChange({ tuNgayDayHOC: val })}
+              accent="purple"
+              title="Chọn từ ngày hồ sơ được đẩy lên cổng HOC"
             />
-            <span className="text-slate-400">-</span>
-            <input
-              type="text"
-              placeholder="dd/mm/yyyy"
+            <span className="text-slate-400 font-bold">-</span>
+            <DatePickerField
               value={filters.denNgayDayHOC}
-              onChange={(e) => onFilterChange({ denNgayDayHOC: e.target.value })}
-              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+              onChange={(val) => onFilterChange({ denNgayDayHOC: val })}
+              accent="purple"
+              title="Chọn đến ngày hồ sơ được đẩy lên cổng HOC"
             />
           </div>
 

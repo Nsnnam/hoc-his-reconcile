@@ -19,8 +19,8 @@ import {
   DateStat, 
   FilterCriteria 
 } from './types';
-import { parseExcelFile } from './utils/fileParser';
-import { performReconciliation } from './utils/reconcileEngine';
+import { parseExcelFile, parseDateToNumber } from './utils/fileParser';
+import { performReconciliation, computeSummaryStats } from './utils/reconcileEngine';
 import { Navbar } from './components/Navbar';
 import { FileUploadArea } from './components/FileUploadArea';
 import { FileListPills } from './components/FileListPills';
@@ -43,26 +43,13 @@ const INITIAL_FILTERS: FilterCriteria = {
   tuNgayKham: '',
   denNgayKham: '',
   tuNgayDayHOC: '',
-  denNgayDayHOC: ''
+  denNgayDayHOC: '',
+  chiLayHoSoHIS: true // MẶC ĐỊNH BẬT: Chỉ rà & lấy thông tin hồ sơ thuộc file HIS (chưa đẩy + đã đẩy khớp mã GD cột K). Bỏ qua Transaction ID chỉ có trên HOC.
 };
 
 export function App() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [reconciledRecords, setReconciledRecords] = useState<ReconciledRecord[]>([]);
-  const [summary, setSummary] = useState<SummaryStats>({
-    total: 0,
-    hocSuccess: 0,
-    hocFailed: 0,
-    hisHasTrans: 0,
-    hisNoTrans: 0,
-    pendingHoc: 0,
-    hocOnly: 0,
-    companiesCount: 0
-  });
-  const [workplaceStats, setWorkplaceStats] = useState<WorkplaceStat[]>([]);
-  const [errorGroupStats, setErrorGroupStats] = useState<ErrorGroupStat[]>([]);
-  const [dateStats, setDateStats] = useState<DateStat[]>([]);
-  const [hocDateStats, setHocDateStats] = useState<DateStat[]>([]);
 
   const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [activeTab, setActiveTab] = useState<'reconcile' | 'workplaces' | 'errors' | 'dates'>('reconcile');
@@ -77,20 +64,6 @@ export function App() {
   useEffect(() => {
     if (uploadedFiles.length === 0) {
       setReconciledRecords([]);
-      setSummary({
-        total: 0,
-        hocSuccess: 0,
-        hocFailed: 0,
-        hisHasTrans: 0,
-        hisNoTrans: 0,
-        pendingHoc: 0,
-        hocOnly: 0,
-        companiesCount: 0
-      });
-      setWorkplaceStats([]);
-      setErrorGroupStats([]);
-      setDateStats([]);
-      setHocDateStats([]);
       return;
     }
 
@@ -99,11 +72,6 @@ export function App() {
     const timer = setTimeout(() => {
       const result = performReconciliation(uploadedFiles);
       setReconciledRecords(result.records);
-      setSummary(result.summary);
-      setWorkplaceStats(result.workplaceStats);
-      setErrorGroupStats(result.errorGroupStats);
-      setDateStats(result.dateStats);
-      setHocDateStats(result.hocDateStats);
       setIsProcessing(false);
     }, 50);
 
@@ -185,9 +153,24 @@ export function App() {
     }
   };
 
-  // Lọc dữ liệu hiển thị theo bộ lọc
+  // 1. Tập hồ sơ cơ sở: Lọc theo tùy chọn "Chỉ rà soát hồ sơ thuộc tệp HIS" (Mặc định: BẬT)
+  const baseRecords = useMemo(() => {
+    if (filters.chiLayHoSoHIS) {
+      // Chỉ lấy hồ sơ chưa đẩy HOC hoặc đã đẩy có Transaction ID trùng khớp với cột K Mã giao dịch trong file xuất HIS
+      // Bỏ qua các Transaction ID chỉ có trên HOC mà không có trong tệp HIS đính kèm
+      return reconciledRecords.filter(r => r.trangThaiDoiChieu !== 'HOC_ONLY');
+    }
+    return reconciledRecords;
+  }, [reconciledRecords, filters.chiLayHoSoHIS]);
+
+  // 2. Thống kê KPI, Nơi làm việc, Nhóm lỗi, Thời gian được tính toán tự động dựa trên baseRecords
+  const stats = useMemo(() => {
+    return computeSummaryStats(baseRecords);
+  }, [baseRecords]);
+
+  // 3. Lọc dữ liệu hiển thị theo bộ lọc
   const filteredRecords = useMemo(() => {
-    return reconciledRecords.filter(r => {
+    return baseRecords.filter(r => {
       // 1. Tìm kiếm chung (Mã BA, Mã BN, Họ tên, CCCD, Mã GD)
       if (filters.searchTerm) {
         const term = filters.searchTerm.trim().toLowerCase();
@@ -218,33 +201,29 @@ export function App() {
         if (r.nhomLoi !== filters.nhomLoi) return false;
       }
 
-      // 5. Ngày đăng ký / tiếp nhận khám (HIS)
-      if (filters.tuNgayKham) {
-        if (!r.ngayKham || !r.ngayKham.includes(filters.tuNgayKham.trim())) {
-          return false;
-        }
-      }
-      if (filters.denNgayKham) {
-        if (!r.ngayKham || !r.ngayKham.includes(filters.denNgayKham.trim())) {
-          return false;
-        }
+      // 5. Ngày đăng ký / tiếp nhận khám (HIS) - Hỗ trợ lọc theo khoảng thời gian từ ngày - đến ngày
+      if (filters.tuNgayKham || filters.denNgayKham) {
+        const rDateNum = parseDateToNumber(r.ngayKham);
+        if (!rDateNum) return false;
+        const tuNum = parseDateToNumber(filters.tuNgayKham);
+        const denNum = parseDateToNumber(filters.denNgayKham);
+        if (tuNum && rDateNum < tuNum) return false;
+        if (denNum && rDateNum > denNum) return false;
       }
 
-      // 6. Thời gian hồ sơ được đẩy lên cổng (HOC)
-      if (filters.tuNgayDayHOC) {
-        if (!r.thoiDiemXuLyHOC || !r.thoiDiemXuLyHOC.includes(filters.tuNgayDayHOC.trim())) {
-          return false;
-        }
-      }
-      if (filters.denNgayDayHOC) {
-        if (!r.thoiDiemXuLyHOC || !r.thoiDiemXuLyHOC.includes(filters.denNgayDayHOC.trim())) {
-          return false;
-        }
+      // 6. Thời gian hồ sơ được đẩy lên cổng (HOC) - Hỗ trợ lọc theo khoảng thời gian từ ngày - đến ngày
+      if (filters.tuNgayDayHOC || filters.denNgayDayHOC) {
+        const rHocNum = parseDateToNumber(r.thoiDiemXuLyHOC);
+        if (!rHocNum) return false;
+        const tuNum = parseDateToNumber(filters.tuNgayDayHOC);
+        const denNum = parseDateToNumber(filters.denNgayDayHOC);
+        if (tuNum && rHocNum < tuNum) return false;
+        if (denNum && rHocNum > denNum) return false;
       }
 
       return true;
     });
-  }, [reconciledRecords, filters]);
+  }, [baseRecords, filters]);
 
   // Handler khi click chọn vào các card tổng hợp
   const handleFilterByStatus = (status: string) => {
@@ -281,14 +260,18 @@ export function App() {
       setFilters(prev => ({
         ...prev,
         tuNgayKham: dateStr,
+        denNgayKham: dateStr,
         tuNgayDayHOC: '',
+        denNgayDayHOC: '',
         searchTerm: ''
       }));
     } else {
       setFilters(prev => ({
         ...prev,
         tuNgayDayHOC: dateStr,
+        denNgayDayHOC: dateStr,
         tuNgayKham: '',
+        denNgayKham: '',
         searchTerm: ''
       }));
     }
@@ -300,8 +283,8 @@ export function App() {
       {/* Top Navigation */}
       <Navbar
         totalFiles={uploadedFiles.length}
-        totalRecords={reconciledRecords.length}
-        successCount={summary.hocSuccess}
+        totalRecords={stats.summary.total}
+        successCount={stats.summary.hocSuccess}
         onOpenUpload={() => uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
         onLoadSamples={handleLoadSamples}
         onExport={() => setIsExportModalOpen(true)}
@@ -341,7 +324,7 @@ export function App() {
           <div className="space-y-6">
             {/* Top KPI Cards (Click to filter!) */}
             <KpiSummaryCards
-              summary={summary}
+              summary={stats.summary}
               activeStatusFilter={filters.trangThaiDoiChieu}
               onFilterByStatus={handleFilterByStatus}
               onSelectWorkplaceTab={() => setActiveTab('workplaces')}
@@ -378,7 +361,7 @@ export function App() {
                   <Building2 className="w-4 h-4" />
                   <span>Tổng hợp theo Nơi làm việc</span>
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-teal-100 text-teal-800 font-mono">
-                    {workplaceStats.length}
+                    {stats.workplaceStats.length}
                   </span>
                 </button>
 
@@ -394,7 +377,7 @@ export function App() {
                   <ShieldAlert className="w-4 h-4" />
                   <span>Phân tích nguyên nhân lỗi HOC</span>
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 font-mono">
-                    {errorGroupStats.length}
+                    {stats.errorGroupStats.length}
                   </span>
                 </button>
 
@@ -410,7 +393,7 @@ export function App() {
                   <Calendar className="w-4 h-4" />
                   <span>Báo cáo Ngày tiếp nhận & Đẩy cổng</span>
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-mono">
-                    {dateStats.length} HIS / {hocDateStats.length} HOC
+                    {stats.dateStats.length} HIS / {stats.hocDateStats.length} HOC
                   </span>
                 </button>
               </div>
@@ -431,9 +414,9 @@ export function App() {
                   filters={filters}
                   onFilterChange={(newF) => setFilters(prev => ({ ...prev, ...newF }))}
                   onResetFilters={() => setFilters(INITIAL_FILTERS)}
-                  workplaces={workplaceStats}
-                  errorGroups={errorGroupStats}
-                  totalRecords={reconciledRecords.length}
+                  workplaces={stats.workplaceStats}
+                  errorGroups={stats.errorGroupStats}
+                  totalRecords={baseRecords.length}
                   filteredCount={filteredRecords.length}
                 />
 
@@ -446,7 +429,7 @@ export function App() {
 
             {activeTab === 'workplaces' && (
               <WorkplaceSummaryTable
-                workplaces={workplaceStats}
+                workplaces={stats.workplaceStats}
                 selectedWorkplace={filters.noiLamViec}
                 onSelectWorkplace={handleSelectWorkplace}
               />
@@ -454,7 +437,7 @@ export function App() {
 
             {activeTab === 'errors' && (
               <ErrorAnalyticsTable
-                errorGroups={errorGroupStats}
+                errorGroups={stats.errorGroupStats}
                 selectedErrorGroup={filters.nhomLoi}
                 onSelectErrorGroup={handleSelectErrorGroup}
               />
@@ -462,8 +445,8 @@ export function App() {
 
             {activeTab === 'dates' && (
               <DateSummaryTable
-                hisDateStats={dateStats}
-                hocDateStats={hocDateStats}
+                hisDateStats={stats.dateStats}
+                hocDateStats={stats.hocDateStats}
                 selectedDate={filters.tuNgayKham || filters.tuNgayDayHOC}
                 onSelectDate={handleSelectDate}
               />
@@ -482,10 +465,10 @@ export function App() {
       <ExportExcelModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        allRecords={reconciledRecords}
+        allRecords={baseRecords}
         filteredRecords={filteredRecords}
-        workplaces={workplaceStats}
-        errorGroups={errorGroupStats}
+        workplaces={stats.workplaceStats}
+        errorGroups={stats.errorGroupStats}
       />
 
       {/* Footer */}

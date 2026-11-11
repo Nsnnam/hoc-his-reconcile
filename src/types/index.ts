@@ -110,6 +110,7 @@ export interface FilterCriteria {
   denNgayKham: string;
   tuNgayDayHOC: string; // Ngày đẩy lên cổng (HOC)
   denNgayDayHOC: string;
+  chiLayHoSoHIS: boolean; // Mặc định TRUE: Chỉ rà & lấy hồ sơ thuộc tệp HIS (chưa đẩy + đã đẩy khớp mã GD cột K). Bỏ qua Transaction ID chỉ có trên HOC.
 }
 
 export interface PortalLink {

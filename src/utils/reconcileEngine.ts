@@ -7,7 +7,7 @@ import {
   UploadedFileRecord,
   WorkplaceStat
 } from '../types';
-import { formatCccd, formatDate, formatDateTime, extractDateOnly, formatPhone, normalizeText } from './fileParser';
+import { formatCccd, formatDate, formatDateTime, extractDateOnly, formatPhone, normalizeText, parseDateToNumber } from './fileParser';
 
 /**
  * Phân tích lỗi từ JSON hoặc text của HOC và trích xuất lỗi dễ hiểu kèm giải pháp
@@ -90,12 +90,18 @@ export function parseHocError(rawError: any): { chiTietLoi: string; nhomLoi: str
 
 /**
  * Tìm giá trị của cột trong một hàng dựa trên danh sách các tên cột tương đương
+ * - Ưu tiên duyệt theo thứ tự danh sách possibleKeys
+ * - Lượt 1: Khớp chính xác hoàn toàn (Exact match)
+ * - Lượt 2: Khớp chứa chuỗi (Substring match)
+ * - Cho phép lọc bỏ các cột chứa từ khóa bị cấm (excludeKeywords, ví dụ cấm 'sinh' khi tìm ngày tiếp nhận)
  */
-function getVal(row: Record<string, any>, possibleKeys: string[]): any {
-  for (const key of Object.keys(row)) {
-    const kNorm = normalizeText(key);
-    for (const p of possibleKeys) {
-      if (kNorm === p || kNorm.includes(p)) {
+function getVal(row: Record<string, any>, possibleKeys: string[], excludeKeywords: string[] = []): any {
+  // Lượt 1: Khớp chính xác hoàn toàn (Exact match)
+  for (const p of possibleKeys) {
+    for (const key of Object.keys(row)) {
+      const kNorm = normalizeText(key);
+      if (excludeKeywords.some(ex => kNorm.includes(ex))) continue;
+      if (kNorm === p) {
         const val = row[key];
         if (val !== undefined && val !== null && String(val).trim() !== '' && String(val).toLowerCase() !== 'nan') {
           return val;
@@ -103,6 +109,21 @@ function getVal(row: Record<string, any>, possibleKeys: string[]): any {
       }
     }
   }
+
+  // Lượt 2: Khớp chứa chuỗi (Substring match)
+  for (const p of possibleKeys) {
+    for (const key of Object.keys(row)) {
+      const kNorm = normalizeText(key);
+      if (excludeKeywords.some(ex => kNorm.includes(ex))) continue;
+      if (kNorm.includes(p)) {
+        const val = row[key];
+        if (val !== undefined && val !== null && String(val).trim() !== '' && String(val).toLowerCase() !== 'nan') {
+          return val;
+        }
+      }
+    }
+  }
+
   return '';
 }
 
@@ -265,7 +286,12 @@ export function performReconciliation(files: UploadedFileRecord[]): {
         record.hoTen = hoTen;
       }
 
-      const ngaySinh = formatDate(getVal(row, ['ngay sinh', 'ngaysinh', 'nam sinh']));
+      // 1. Ngày sinh: Tuyệt đối không nhầm sang ngày tiếp nhận / khám
+      const ngaySinh = formatDate(getVal(
+        row,
+        ['ngay sinh', 'ngaysinh', 'nam sinh', 'namsinh', 'ngay thang nam sinh'],
+        ['tiep nhan', 'kham', 'dang ky', 'ra vien', 'tn']
+      ));
       if (ngaySinh && !record.ngaySinh) record.ngaySinh = ngaySinh;
 
       const gioiTinh = String(getVal(row, ['gioi tinh', 'gioitinh', 'phai'])).trim();
@@ -277,9 +303,9 @@ export function performReconciliation(files: UploadedFileRecord[]): {
       const diaChi = String(getVal(row, ['dia chi', 'd/c bn', 'diachi', 'dia chi bn'])).trim();
       if (diaChi && !record.diaChi) record.diaChi = diaChi;
 
-      // NƠI LÀM VIỆC (Ưu tiên cập nhật nếu có)
+      // NƠI LÀM VIỆC (Ưu tiên cập nhật nếu có hoặc từ file tiếp nhận)
       const noiLamViec = String(getVal(row, ['noi lam viec', 'cong ty', 'don vi', 'doanh nghiep', 'co quan'])).trim();
-      if (noiLamViec && (!record.noiLamViec || record.noiLamViec === 'Chưa cập nhật')) {
+      if (noiLamViec && (!record.noiLamViec || record.noiLamViec === 'Chưa cập nhật' || record.noiLamViec === 'Khám tự do / Khác' || file.fileType === 'HIS_RECEPTION')) {
         record.noiLamViec = noiLamViec;
       }
 
@@ -289,8 +315,27 @@ export function performReconciliation(files: UploadedFileRecord[]): {
       const nguoiTN = String(getVal(row, ['nguoi tn', 'nguoi tiep nhan', 'bac si', 'bs'])).trim();
       if (nguoiTN && !record.nguoiTiepNhan) record.nguoiTiepNhan = nguoiTN;
 
-      const ngayKham = formatDateTime(getVal(row, ['ngay tiep nhan', 'ngay kham', 'ngaytn', 'ngay dang ky', 'ngay']));
-      if (ngayKham && !record.ngayKham) record.ngayKham = ngayKham;
+      // 2. Ngày tiếp nhận / đăng ký khám (HIS): Tuyệt đối không nhầm sang ngày sinh hoặc ngày ra viện
+      const ngayKham = formatDateTime(getVal(
+        row,
+        [
+          'ngay tiep nhan',
+          'ngaytn',
+          'ngay dang ky',
+          'ngay kham',
+          'thoi gian tiep nhan',
+          'thoi gian kham',
+          'thoi gian dang ky',
+          'gio tiep nhan',
+          'ngaygio tiep nhan'
+        ],
+        ['sinh', 'ra vien', 'sinh nhat', 'nsinh']
+      ));
+      if (ngayKham) {
+        if (!record.ngayKham || file.fileType === 'HIS_RECEPTION' || record.ngayKham === record.ngaySinh) {
+          record.ngayKham = ngayKham;
+        }
+      }
 
       const loaiGiay = String(getVal(row, ['loai giay', 'loaigiay'])).trim();
       if (loaiGiay && !record.loaiGiay) record.loaiGiay = loaiGiay;
@@ -437,6 +482,29 @@ export function performReconciliation(files: UploadedFileRecord[]): {
     return (b.ngayKham || '').localeCompare(a.ngayKham || '');
   });
 
+  const stats = computeSummaryStats(records);
+
+  return {
+    records,
+    summary: stats.summary,
+    workplaceStats: stats.workplaceStats,
+    errorGroupStats: stats.errorGroupStats,
+    dateStats: stats.dateStats,
+    hocDateStats: stats.hocDateStats
+  };
+}
+
+/**
+ * Tính toán nhanh các chỉ số thống kê tổng hợp (KPI, Nơi làm việc, Nhóm lỗi, Thời gian)
+ * trên bất kỳ tập hồ sơ nào (Ví dụ: tập hồ sơ đã loại trừ các giao dịch mồ côi trên HOC)
+ */
+export function computeSummaryStats(records: ReconciledRecord[]): {
+  summary: SummaryStats;
+  workplaceStats: WorkplaceStat[];
+  errorGroupStats: ErrorGroupStat[];
+  dateStats: DateStat[];
+  hocDateStats: DateStat[];
+} {
   // Tính toán thống kê tổng hợp (Summary KPIs)
   const summary: SummaryStats = {
     total: records.length,
@@ -534,7 +602,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
     hocFailed: stat.hocFailed,
     hisNoTrans: stat.hisNoTrans,
     type: 'NGAY_TIEP_NHAN' as const
-  })).sort((a, b) => b.ngay.localeCompare(a.ngay));
+  })).sort((a, b) => (parseDateToNumber(b.ngay) || 0) - (parseDateToNumber(a.ngay) || 0));
 
   const hocDateStats: DateStat[] = Array.from(hocDateMap.entries()).map(([ngay, stat]) => ({
     ngay,
@@ -543,10 +611,9 @@ export function performReconciliation(files: UploadedFileRecord[]): {
     hocFailed: stat.hocFailed,
     hisNoTrans: stat.hisNoTrans,
     type: 'NGAY_DAY_HOC' as const
-  })).sort((a, b) => b.ngay.localeCompare(a.ngay));
+  })).sort((a, b) => (parseDateToNumber(b.ngay) || 0) - (parseDateToNumber(a.ngay) || 0));
 
   return {
-    records,
     summary,
     workplaceStats,
     errorGroupStats,

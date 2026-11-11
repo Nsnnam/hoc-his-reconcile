@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, FileSpreadsheet, X, CheckCircle, ShieldAlert, Building2 } from 'lucide-react';
+import { Download, FileSpreadsheet, X, CheckCircle, ShieldAlert, Building2, Sparkles } from 'lucide-react';
 import { ErrorGroupStat, ReconciledRecord, WorkplaceStat } from '../types';
 import { exportReconciliationToExcel } from '../utils/excelExporter';
 
@@ -164,6 +164,16 @@ export const ExportExcelModal: React.FC<ExportExcelModalProps> = ({
                 </p>
               </div>
             </label>
+          </div>
+
+          <div className="p-3 bg-sky-50/70 rounded-xl border border-sky-200 text-sky-950 text-[11px] space-y-1">
+            <div className="flex items-center space-x-1.5 font-bold text-sky-900">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>Tiêu chuẩn rà soát & lọc báo cáo:</span>
+            </div>
+            <p className="text-slate-600 pl-5">
+              Hệ thống mặc định chỉ rà và xuất các hồ sơ thuộc tệp HIS (hồ sơ chưa đẩy HOC và hồ sơ đã đẩy có Transaction ID trùng khớp với cột K Mã giao dịch trong tệp xuất HIS); các Transaction ID dư trên HOC đã được tự động bỏ qua.
+            </p>
           </div>
 
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 text-[11px] space-y-1">

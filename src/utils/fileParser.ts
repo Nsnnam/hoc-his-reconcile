@@ -112,10 +112,67 @@ export function extractDateOnly(val: any): string {
 }
 
 /**
- * Chuẩn hóa chuỗi ngày tháng
+ * Chuẩn hóa chuỗi ngày tháng (chỉ lấy ngày dd/mm/yyyy, thích hợp cho Ngày sinh)
  */
 export function formatDate(val: any): string {
-  return formatDateTime(val);
+  const dt = formatDateTime(val);
+  if (!dt) return '';
+  return dt.split(' ')[0] || '';
+}
+
+/**
+ * Chuyển đổi chuỗi ngày (dd/mm/yyyy hoặc yyyy-mm-dd) thành số nguyên yyyymmdd để so sánh khoảng thời gian
+ * Ví dụ: 15/10/2026 -> 20261015, 2026-10-15 -> 20261015
+ */
+export function parseDateToNumber(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const trimmed = String(dateStr).trim();
+  if (!trimmed || trimmed.toLowerCase() === 'nan') return null;
+
+  // 1. Dạng yyyy-mm-dd
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    return Number(y) * 10000 + Number(m) * 100 + Number(d);
+  }
+
+  // 2. Dạng dd/mm/yyyy
+  const vnMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (vnMatch) {
+    const [, d, m, y] = vnMatch;
+    return Number(y) * 10000 + Number(m) * 100 + Number(d);
+  }
+
+  return null;
+}
+
+/**
+ * Chuyển dd/mm/yyyy sang định dạng yyyy-mm-dd cho thẻ <input type="date">
+ */
+export function toInputDateValue(val: string | null | undefined): string {
+  if (!val) return '';
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) {
+    const [, d, mth, y] = m;
+    return `${y}-${mth.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return '';
+}
+
+/**
+ * Chuyển yyyy-mm-dd từ thẻ <input type="date"> sang dd/mm/yyyy
+ */
+export function fromInputDateValue(val: string | null | undefined): string {
+  if (!val) return '';
+  const s = String(val).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const [, y, mth, d] = m;
+    return `${d}/${mth}/${y}`;
+  }
+  return s;
 }
 
 /**
