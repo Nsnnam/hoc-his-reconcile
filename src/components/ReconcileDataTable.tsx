@@ -122,12 +122,13 @@ export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
             <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 uppercase tracking-wider font-semibold text-[11px] select-none sticky top-0 z-10">
               <th className="py-2.5 px-3 w-12 text-center">STT</th>
               <th className="py-2.5 px-3 w-28">Mã BA (Mã BN)</th>
-              <th className="py-2.5 px-3 w-44">Tên bệnh nhân</th>
-              <th className="py-2.5 px-3 w-48">Nơi làm việc</th>
-              <th className="py-2.5 px-3 w-32">Ngày khám</th>
-              <th className="py-2.5 px-3 w-48">Mã giao dịch (HIS)</th>
+              <th className="py-2.5 px-3 w-40">Tên bệnh nhân</th>
+              <th className="py-2.5 px-3 w-44">Nơi làm việc</th>
+              <th className="py-2.5 px-3 w-36">Ngày tiếp nhận (HIS)</th>
+              <th className="py-2.5 px-3 w-36">Thời gian đẩy (HOC)</th>
+              <th className="py-2.5 px-3 w-44">Mã giao dịch (HIS)</th>
               <th className="py-2.5 px-3 w-32 text-center">Trạng thái HOC</th>
-              <th className="py-2.5 px-3 w-64">Chi tiết lỗi & Phản hồi</th>
+              <th className="py-2.5 px-3 w-60">Chi tiết lỗi & Phản hồi</th>
               <th className="py-2.5 px-3 w-28 text-center">Thông tin khác</th>
               <th className="py-2.5 px-3 w-16 text-center">Chi tiết</th>
             </tr>
@@ -135,7 +136,7 @@ export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
           <tbody className="divide-y divide-slate-100">
             {records.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-12 text-center text-slate-400">
+                <td colSpan={11} className="py-12 text-center text-slate-400">
                   Không tìm thấy hồ sơ nào phù hợp với bộ lọc hiện tại
                 </td>
               </tr>
@@ -201,16 +202,27 @@ export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
                       )}
                     </td>
 
-                    {/* Ngày khám */}
-                    <td className="py-2 px-3 text-slate-600">
-                      <div className="flex items-center space-x-1 font-mono text-[11px]">
-                        <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span>{r.ngayKham || '—'}</span>
-                      </div>
-                      {r.thoiDiemXuLyHOC && (
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5" title="Thời điểm xử lý HOC">
-                          HOC: {r.thoiDiemXuLyHOC}
+                    {/* 1. Ngày đăng ký / tiếp nhận khám từ HIS */}
+                    <td className="py-2 px-3 text-slate-700">
+                      {r.ngayKham ? (
+                        <div className="flex items-center space-x-1.5 font-mono text-[11px] font-medium text-slate-800">
+                          <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>{r.ngayKham}</span>
                         </div>
+                      ) : (
+                        <span className="text-slate-300 italic text-[11px]">Chưa có ngày</span>
+                      )}
+                    </td>
+
+                    {/* 2. Thời gian hồ sơ được đẩy lên cổng HOC */}
+                    <td className="py-2 px-3 text-slate-700">
+                      {r.thoiDiemXuLyHOC ? (
+                        <div className="flex items-center space-x-1.5 font-mono text-[11px] font-medium text-purple-900 bg-purple-50/70 px-1.5 py-0.5 rounded border border-purple-100 w-fit">
+                          <Clock className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                          <span>{r.thoiDiemXuLyHOC}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 italic text-[11px]">Chưa đẩy cổng</span>
                       )}
                     </td>
 

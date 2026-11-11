@@ -35,7 +35,9 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
     filters.trangThaiDoiChieu !== 'ALL' ||
     filters.nhomLoi !== 'ALL' ||
     Boolean(filters.tuNgayKham) ||
-    Boolean(filters.denNgayKham);
+    Boolean(filters.denNgayKham) ||
+    Boolean(filters.tuNgayDayHOC) ||
+    Boolean(filters.denNgayDayHOC);
 
   return (
     <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
@@ -114,35 +116,63 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
         </div>
       </div>
 
-      {/* Second Row: Date Filter & Status Counter */}
+      {/* Second Row: Date Filters & Status Counter */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
         {/* Date Filter & Active Filter Tags */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-slate-500 flex items-center gap-1 font-medium">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>Ngày khám:</span>
-          </span>
-          <input
-            type="text"
-            placeholder="Từ ngày (VD: 15/10/2026)"
-            value={filters.tuNgayKham}
-            onChange={(e) => onFilterChange({ tuNgayKham: e.target.value })}
-            className="w-36 px-2.5 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-sky-500"
-          />
-          <span className="text-slate-400">-</span>
-          <input
-            type="text"
-            placeholder="Đến ngày (VD: 30/10/2026)"
-            value={filters.denNgayKham}
-            onChange={(e) => onFilterChange({ denNgayKham: e.target.value })}
-            className="w-36 px-2.5 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-sky-500"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          {/* HIS Date */}
+          <div className="flex items-center space-x-1.5">
+            <span className="text-slate-600 flex items-center gap-1 font-semibold text-[11px]">
+              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Tiếp nhận (HIS):</span>
+            </span>
+            <input
+              type="text"
+              placeholder="dd/mm/yyyy"
+              value={filters.tuNgayKham}
+              onChange={(e) => onFilterChange({ tuNgayKham: e.target.value })}
+              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+            />
+            <span className="text-slate-400">-</span>
+            <input
+              type="text"
+              placeholder="dd/mm/yyyy"
+              value={filters.denNgayKham}
+              onChange={(e) => onFilterChange({ denNgayKham: e.target.value })}
+              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+            />
+          </div>
+
+          <span className="text-slate-300 hidden sm:inline">|</span>
+
+          {/* HOC Push Date */}
+          <div className="flex items-center space-x-1.5">
+            <span className="text-slate-600 flex items-center gap-1 font-semibold text-[11px]">
+              <Calendar className="w-3.5 h-3.5 text-purple-600" />
+              <span>Đẩy cổng (HOC):</span>
+            </span>
+            <input
+              type="text"
+              placeholder="dd/mm/yyyy"
+              value={filters.tuNgayDayHOC}
+              onChange={(e) => onFilterChange({ tuNgayDayHOC: e.target.value })}
+              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+            />
+            <span className="text-slate-400">-</span>
+            <input
+              type="text"
+              placeholder="dd/mm/yyyy"
+              value={filters.denNgayDayHOC}
+              onChange={(e) => onFilterChange({ denNgayDayHOC: e.target.value })}
+              className="w-28 px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+            />
+          </div>
 
           {hasActiveFilters && (
             <button
               type="button"
               onClick={onResetFilters}
-              className="inline-flex items-center space-x-1 px-2.5 py-1 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded border border-rose-200 transition-colors font-medium ml-2"
+              className="inline-flex items-center space-x-1 px-2.5 py-1 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded border border-rose-200 transition-colors font-medium ml-1"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Xóa bộ lọc</span>

@@ -42,27 +42,80 @@ export function formatPhone(val: any): string {
 }
 
 /**
- * Chuẩn hóa chuỗi ngày tháng
+ * Chuẩn hóa thời gian thành định dạng dd/mm/yyyy hh:mm:ss
+ * Xử lý:
+ * - Định dạng HOC: yyyy-mm-dd(T)hh:mm:ss(.xxxxxx) -> dd/mm/yyyy hh:mm:ss
+ * - Định dạng HIS: dd/mm/yyyy hh:mm:ss -> dd/mm/yyyy hh:mm:ss
+ * - Excel serial number
  */
-export function formatDate(val: any): string {
-  if (!val) return '';
+export function formatDateTime(val: any): string {
+  if (val === null || val === undefined || val === '') return '';
+
   if (typeof val === 'number') {
-    // Excel serial date
     try {
       const d = XLSX.SSF.parse_date_code(val);
       if (d) {
         const dd = String(d.d).padStart(2, '0');
         const mm = String(d.m).padStart(2, '0');
         const yyyy = d.y;
+        if (d.H !== undefined && (d.H > 0 || d.M > 0 || d.S > 0)) {
+          const hh = String(d.H).padStart(2, '0');
+          const min = String(d.M).padStart(2, '0');
+          const ss = String(Math.floor(d.S)).padStart(2, '0');
+          return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+        }
         return `${dd}/${mm}/${yyyy}`;
       }
     } catch {
       // fallback
     }
   }
+
   const str = String(val).trim();
   if (!str || str.toLowerCase() === 'nan') return '';
+
+  // 1. Khớp định dạng ISO: yyyy-mm-dd(T)hh:mm:ss(.xxxxxx) từ HOC
+  const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[T\s](\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.\d+)?/);
+  if (isoMatch) {
+    const [, y, m, d, hh, mm, ss] = isoMatch;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y} ${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:${ss.padStart(2, '0')}`;
+  }
+
+  // 2. Khớp định dạng ngày ISO chỉ có yyyy-mm-dd
+  const isoDateOnly = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoDateOnly) {
+    const [, y, m, d] = isoDateOnly;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+
+  // 3. Khớp định dạng ngày/tháng/năm của HIS: dd/mm/yyyy hh:mm:ss
+  const vnMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/);
+  if (vnMatch) {
+    const [, d, m, y, hh, mm, ss] = vnMatch;
+    const datePart = `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    if (hh !== undefined && mm !== undefined && ss !== undefined) {
+      return `${datePart} ${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:${ss.padStart(2, '0')}`;
+    }
+    return datePart;
+  }
+
   return str;
+}
+
+/**
+ * Lấy riêng phần ngày dd/mm/yyyy từ chuỗi ngày giờ
+ */
+export function extractDateOnly(val: any): string {
+  const dt = formatDateTime(val);
+  if (!dt) return '';
+  return dt.split(' ')[0] || '';
+}
+
+/**
+ * Chuẩn hóa chuỗi ngày tháng
+ */
+export function formatDate(val: any): string {
+  return formatDateTime(val);
 }
 
 /**

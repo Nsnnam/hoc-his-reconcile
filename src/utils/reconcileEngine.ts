@@ -7,7 +7,7 @@ import {
   UploadedFileRecord,
   WorkplaceStat
 } from '../types';
-import { formatCccd, formatDate, formatPhone, normalizeText } from './fileParser';
+import { formatCccd, formatDate, formatDateTime, extractDateOnly, formatPhone, normalizeText } from './fileParser';
 
 /**
  * Phân tích lỗi từ JSON hoặc text của HOC và trích xuất lỗi dễ hiểu kèm giải pháp
@@ -115,6 +115,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
   workplaceStats: WorkplaceStat[];
   errorGroupStats: ErrorGroupStat[];
   dateStats: DateStat[];
+  hocDateStats: DateStat[];
 } {
   // Bản đồ lưu trữ các bản ghi duy nhất
   const masterMap = new Map<string, ReconciledRecord>();
@@ -155,7 +156,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
 
         const rawTrangThai = String(getVal(row, ['trang thai', 'trangthai', 'ket qua'])).trim();
         const ketQuaRaw = String(getVal(row, ['ket qua tiep nhan', 'ketquatiepnhan', 'noi dung'])).trim();
-        const thoiDiemXuLy = formatDate(getVal(row, ['thoi diem xu ly', 'ngay xu ly', 'thoidiemxuly']));
+        const thoiDiemXuLy = formatDateTime(getVal(row, ['thoi diem xu ly', 'ngay xu ly', 'thoidiemxuly']));
         const maLienKet = String(getVal(row, ['ma lien ket', 'malienket'])).trim();
         const maCoSoKCB = String(getVal(row, ['ma co so kcb', 'macoso'])).trim();
 
@@ -288,7 +289,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
       const nguoiTN = String(getVal(row, ['nguoi tn', 'nguoi tiep nhan', 'bac si', 'bs'])).trim();
       if (nguoiTN && !record.nguoiTiepNhan) record.nguoiTiepNhan = nguoiTN;
 
-      const ngayKham = formatDate(getVal(row, ['ngay tiep nhan', 'ngay kham', 'ngaytn', 'ngay']));
+      const ngayKham = formatDateTime(getVal(row, ['ngay tiep nhan', 'ngay kham', 'ngaytn', 'ngay dang ky', 'ngay']));
       if (ngayKham && !record.ngayKham) record.ngayKham = ngayKham;
 
       const loaiGiay = String(getVal(row, ['loai giay', 'loaigiay'])).trim();
@@ -310,7 +311,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
         const ketQuaGui = String(getVal(row, ['ket qua gui', 'ketquagui'])).trim();
         if (ketQuaGui) record.ketQuaGuiHIS = ketQuaGui;
 
-        const thoiGianKq = formatDate(getVal(row, ['thoi gian kq', 'thoigiankq']));
+        const thoiGianKq = formatDateTime(getVal(row, ['thoi gian kq', 'thoigiankq']));
         if (thoiGianKq) record.thoiGianKqHIS = thoiGianKq;
       }
 
@@ -389,7 +390,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
         noiLamViec: 'Chưa xác định trên HIS',
         khoaPhong: '',
         nguoiTiepNhan: '',
-        ngayKham: hoc.thoiDiemXuLy ? hoc.thoiDiemXuLy.split(' ')[0] : '',
+        ngayKham: '', // Không dùng thời điểm xử lý của HOC làm ngày khám
         ngayDayHoSo: hoc.thoiDiemXuLy,
         maGiaoDich: transId,
         nguoiGuiHIS: '',
@@ -495,26 +496,53 @@ export function performReconciliation(files: UploadedFileRecord[]): {
     tiLe: summary.hocFailed > 0 ? Math.round((stat.count / summary.hocFailed) * 100) : 0
   })).sort((a, b) => b.count - a.count);
 
-  // Thống kê theo ngày khám
-  const dMap = new Map<string, { total: number; hocSuccess: number; hocFailed: number; hisNoTrans: number }>();
+  // 1. Thống kê theo Ngày đăng ký / tiếp nhận khám (HIS)
+  const hisDateMap = new Map<string, { total: number; hocSuccess: number; hocFailed: number; hisNoTrans: number }>();
+  // 2. Thống kê theo Ngày đẩy hồ sơ lên cổng (HOC)
+  const hocDateMap = new Map<string, { total: number; hocSuccess: number; hocFailed: number; hisNoTrans: number }>();
+
   for (const r of records) {
-    const rawD = r.ngayKham ? r.ngayKham.split(' ')[0] : 'Không rõ';
-    if (!dMap.has(rawD)) {
-      dMap.set(rawD, { total: 0, hocSuccess: 0, hocFailed: 0, hisNoTrans: 0 });
+    // Nhóm theo ngày tiếp nhận HIS
+    const dHis = extractDateOnly(r.ngayKham) || 'Chưa rõ ngày khám';
+    if (!hisDateMap.has(dHis)) {
+      hisDateMap.set(dHis, { total: 0, hocSuccess: 0, hocFailed: 0, hisNoTrans: 0 });
     }
-    const stat = dMap.get(rawD)!;
-    stat.total++;
-    if (r.trangThaiHOC === 'Thành công') stat.hocSuccess++;
-    else if (r.trangThaiHOC === 'Thất bại') stat.hocFailed++;
-    if (!r.coMaGiaoDichHIS) stat.hisNoTrans++;
+    const statHis = hisDateMap.get(dHis)!;
+    statHis.total++;
+    if (r.trangThaiHOC === 'Thành công') statHis.hocSuccess++;
+    else if (r.trangThaiHOC === 'Thất bại') statHis.hocFailed++;
+    if (!r.coMaGiaoDichHIS) statHis.hisNoTrans++;
+
+    // Nhóm theo ngày đẩy lên cổng HOC
+    if (r.thoiDiemXuLyHOC) {
+      const dHoc = extractDateOnly(r.thoiDiemXuLyHOC) || 'Chưa rõ ngày đẩy';
+      if (!hocDateMap.has(dHoc)) {
+        hocDateMap.set(dHoc, { total: 0, hocSuccess: 0, hocFailed: 0, hisNoTrans: 0 });
+      }
+      const statHoc = hocDateMap.get(dHoc)!;
+      statHoc.total++;
+      if (r.trangThaiHOC === 'Thành công') statHoc.hocSuccess++;
+      else if (r.trangThaiHOC === 'Thất bại') statHoc.hocFailed++;
+      if (!r.coMaGiaoDichHIS) statHoc.hisNoTrans++;
+    }
   }
 
-  const dateStats: DateStat[] = Array.from(dMap.entries()).map(([ngay, stat]) => ({
+  const dateStats: DateStat[] = Array.from(hisDateMap.entries()).map(([ngay, stat]) => ({
     ngay,
     total: stat.total,
     hocSuccess: stat.hocSuccess,
     hocFailed: stat.hocFailed,
-    hisNoTrans: stat.hisNoTrans
+    hisNoTrans: stat.hisNoTrans,
+    type: 'NGAY_TIEP_NHAN' as const
+  })).sort((a, b) => b.ngay.localeCompare(a.ngay));
+
+  const hocDateStats: DateStat[] = Array.from(hocDateMap.entries()).map(([ngay, stat]) => ({
+    ngay,
+    total: stat.total,
+    hocSuccess: stat.hocSuccess,
+    hocFailed: stat.hocFailed,
+    hisNoTrans: stat.hisNoTrans,
+    type: 'NGAY_DAY_HOC' as const
   })).sort((a, b) => b.ngay.localeCompare(a.ngay));
 
   return {
@@ -522,6 +550,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
     summary,
     workplaceStats,
     errorGroupStats,
-    dateStats
+    dateStats,
+    hocDateStats
   };
 }

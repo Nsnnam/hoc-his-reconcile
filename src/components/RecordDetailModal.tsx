@@ -172,8 +172,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                   <span className="text-slate-800">{record.nguoiTiepNhan || '—'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Ngày khám / Tiếp nhận:</span>
-                  <span className="font-mono text-slate-800">{record.ngayKham || '—'}</span>
+                  <span className="text-slate-500">Ngày đăng ký / tiếp nhận (HIS):</span>
+                  <span className="font-mono font-semibold text-emerald-700">{record.ngayKham || '—'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Địa chỉ:</span>
@@ -226,8 +226,8 @@ export const RecordDetailModal: React.FC<RecordDetailModalProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Thời điểm xử lý HOC:</span>
-                  <span className="font-mono text-slate-800">{record.thoiDiemXuLyHOC || '—'}</span>
+                  <span className="text-slate-500">Thời gian đẩy / Xử lý (HOC):</span>
+                  <span className="font-mono font-semibold text-purple-700">{record.thoiDiemXuLyHOC || '—'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Mã liên kết HOC:</span>

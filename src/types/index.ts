@@ -91,11 +91,12 @@ export interface ErrorGroupStat {
 }
 
 export interface DateStat {
-  ngay: string;
+  ngay: string; // dd/mm/yyyy
   total: number;
   hocSuccess: number;
   hocFailed: number;
   hisNoTrans: number;
+  type?: 'NGAY_TIEP_NHAN' | 'NGAY_DAY_HOC';
 }
 
 export interface FilterCriteria {
@@ -105,8 +106,10 @@ export interface FilterCriteria {
   trangThaiHOC: string; // 'ALL' | 'Thành công' | 'Thất bại' | 'Chưa đồng bộ'
   trangThaiHIS: string; // 'ALL' | 'HAS_TRANS' | 'NO_TRANS'
   nhomLoi: string;
-  tuNgayKham: string;
+  tuNgayKham: string; // Ngày đăng ký / tiếp nhận khám (HIS)
   denNgayKham: string;
+  tuNgayDayHOC: string; // Ngày đẩy lên cổng (HOC)
+  denNgayDayHOC: string;
 }
 
 export interface PortalLink {

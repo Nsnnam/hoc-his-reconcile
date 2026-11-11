@@ -16,14 +16,14 @@ export function exportReconciliationToExcel(
     'Mã Bệnh Nhân (BN)': r.maBN || '',
     'Họ và Tên': r.hoTen || '',
     'Nơi Làm Việc (Công ty)': r.noiLamViec || '',
-    'Ngày Tiếp Nhận / Khám': r.ngayKham || '',
+    'Ngày Đăng Ký / Tiếp Nhận (HIS)': r.ngayKham || '',
+    'Thời Gian Đẩy Hồ Sơ (HOC)': r.thoiDiemXuLyHOC || '',
     'Mã Giao Dịch (Transaction ID)': r.maGiaoDich || '',
     'Trạng Thái HOC': r.trangThaiHOC,
     'Kết Quả Đối Chiếu': r.nhanDoiChieu,
     'Nhóm Lỗi': r.nhomLoi || '',
     'Chi Tiết Lỗi / Phản Hồi': r.chiTietLoi || '',
     'Hướng Dẫn Khắc Phục': r.huongDanKhacPhuc || '',
-    'Thời Điểm Xử Lý HOC': r.thoiDiemXuLyHOC || '',
     'Người Gửi HIS': r.nguoiGuiHIS || '',
     'Kết Quả Gửi HIS': r.ketQuaGuiHIS || '',
     'Thời Gian KQ HIS': r.thoiGianKqHIS || '',
@@ -47,14 +47,14 @@ export function exportReconciliationToExcel(
     { wch: 14 }, // Mã BN
     { wch: 24 }, // Họ tên
     { wch: 30 }, // Nơi làm việc
-    { wch: 20 }, // Ngày khám
+    { wch: 24 }, // Ngày tiếp nhận HIS
+    { wch: 24 }, // Thời gian đẩy HOC
     { wch: 35 }, // Mã GD
     { wch: 15 }, // TT HOC
     { wch: 22 }, // KQ Đối chiếu
     { wch: 32 }, // Nhóm lỗi
     { wch: 45 }, // Chi tiết lỗi
     { wch: 45 }, // Hướng dẫn
-    { wch: 22 }, // Thời điểm xử lý
     { wch: 20 }, // Người gửi
     { wch: 20 }, // KQ HIS
     { wch: 20 }, // TG KQ HIS

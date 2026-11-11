@@ -41,7 +41,9 @@ const INITIAL_FILTERS: FilterCriteria = {
   trangThaiHIS: 'ALL',
   nhomLoi: 'ALL',
   tuNgayKham: '',
-  denNgayKham: ''
+  denNgayKham: '',
+  tuNgayDayHOC: '',
+  denNgayDayHOC: ''
 };
 
 export function App() {
@@ -60,6 +62,7 @@ export function App() {
   const [workplaceStats, setWorkplaceStats] = useState<WorkplaceStat[]>([]);
   const [errorGroupStats, setErrorGroupStats] = useState<ErrorGroupStat[]>([]);
   const [dateStats, setDateStats] = useState<DateStat[]>([]);
+  const [hocDateStats, setHocDateStats] = useState<DateStat[]>([]);
 
   const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [activeTab, setActiveTab] = useState<'reconcile' | 'workplaces' | 'errors' | 'dates'>('reconcile');
@@ -87,6 +90,7 @@ export function App() {
       setWorkplaceStats([]);
       setErrorGroupStats([]);
       setDateStats([]);
+      setHocDateStats([]);
       return;
     }
 
@@ -99,6 +103,7 @@ export function App() {
       setWorkplaceStats(result.workplaceStats);
       setErrorGroupStats(result.errorGroupStats);
       setDateStats(result.dateStats);
+      setHocDateStats(result.hocDateStats);
       setIsProcessing(false);
     }, 50);
 
@@ -213,10 +218,27 @@ export function App() {
         if (r.nhomLoi !== filters.nhomLoi) return false;
       }
 
-      // 5. Ngày khám
+      // 5. Ngày đăng ký / tiếp nhận khám (HIS)
       if (filters.tuNgayKham) {
         if (!r.ngayKham || !r.ngayKham.includes(filters.tuNgayKham.trim())) {
-          // simple check
+          return false;
+        }
+      }
+      if (filters.denNgayKham) {
+        if (!r.ngayKham || !r.ngayKham.includes(filters.denNgayKham.trim())) {
+          return false;
+        }
+      }
+
+      // 6. Thời gian hồ sơ được đẩy lên cổng (HOC)
+      if (filters.tuNgayDayHOC) {
+        if (!r.thoiDiemXuLyHOC || !r.thoiDiemXuLyHOC.includes(filters.tuNgayDayHOC.trim())) {
+          return false;
+        }
+      }
+      if (filters.denNgayDayHOC) {
+        if (!r.thoiDiemXuLyHOC || !r.thoiDiemXuLyHOC.includes(filters.denNgayDayHOC.trim())) {
+          return false;
         }
       }
 
@@ -253,12 +275,23 @@ export function App() {
     setActiveTab('reconcile');
   };
 
-  // Handler khi click chọn ngày khám
-  const handleSelectDate = (dateStr: string) => {
-    setFilters(prev => ({
-      ...prev,
-      searchTerm: dateStr
-    }));
+  // Handler khi click chọn ngày từ bảng thống kê thời gian
+  const handleSelectDate = (dateStr: string, type: 'HIS' | 'HOC') => {
+    if (type === 'HIS') {
+      setFilters(prev => ({
+        ...prev,
+        tuNgayKham: dateStr,
+        tuNgayDayHOC: '',
+        searchTerm: ''
+      }));
+    } else {
+      setFilters(prev => ({
+        ...prev,
+        tuNgayDayHOC: dateStr,
+        tuNgayKham: '',
+        searchTerm: ''
+      }));
+    }
     setActiveTab('reconcile');
   };
 
@@ -375,9 +408,9 @@ export function App() {
                   }`}
                 >
                   <Calendar className="w-4 h-4" />
-                  <span>Theo Ngày khám</span>
+                  <span>Báo cáo Ngày tiếp nhận & Đẩy cổng</span>
                   <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 text-blue-800 font-mono">
-                    {dateStats.length}
+                    {dateStats.length} HIS / {hocDateStats.length} HOC
                   </span>
                 </button>
               </div>
@@ -429,8 +462,9 @@ export function App() {
 
             {activeTab === 'dates' && (
               <DateSummaryTable
-                dateStats={dateStats}
-                selectedDate={filters.searchTerm}
+                hisDateStats={dateStats}
+                hocDateStats={hocDateStats}
+                selectedDate={filters.tuNgayKham || filters.tuNgayDayHOC}
                 onSelectDate={handleSelectDate}
               />
             )}
