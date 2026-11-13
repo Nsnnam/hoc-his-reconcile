@@ -19,7 +19,7 @@ import {
   DateStat, 
   FilterCriteria 
 } from './types';
-import { parseExcelFile, parseDateToNumber } from './utils/fileParser';
+import { parseExcelFile, parseDateToNumber, extractDateOnly } from './utils/fileParser';
 import { performReconciliation, computeSummaryStats } from './utils/reconcileEngine';
 import { Navbar } from './components/Navbar';
 import { FileUploadArea } from './components/FileUploadArea';
@@ -36,6 +36,9 @@ import { ExportExcelModal } from './components/ExportExcelModal';
 const INITIAL_FILTERS: FilterCriteria = {
   searchTerm: '',
   noiLamViec: 'ALL',
+  danhSachNoiLamViec: [],
+  phongKham: 'ALL',
+  danhSachPhongKham: [],
   trangThaiDoiChieu: 'ALL',
   trangThaiHOC: 'ALL',
   trangThaiHIS: 'ALL',
@@ -44,7 +47,8 @@ const INITIAL_FILTERS: FilterCriteria = {
   denNgayKham: '',
   tuNgayDayHOC: '',
   denNgayDayHOC: '',
-  chiLayHoSoHIS: true // MẶC ĐỊNH BẬT: Chỉ rà & lấy thông tin hồ sơ thuộc file HIS (chưa đẩy + đã đẩy khớp mã GD cột K). Bỏ qua Transaction ID chỉ có trên HOC.
+  chiLayHoSoHIS: true, // MẶC ĐỊNH BẬT: Chỉ rà & lấy thông tin hồ sơ thuộc file HIS (chưa đẩy + đã đẩy khớp mã GD cột K). Bỏ qua Transaction ID chỉ có trên HOC.
+  columnFilters: {}
 };
 
 export function App() {
@@ -186,9 +190,18 @@ export function App() {
         }
       }
 
-      // 2. Nơi làm việc
-      if (filters.noiLamViec !== 'ALL') {
+      // 2. Nơi làm việc / Doanh nghiệp (Đa chọn danhSachNoiLamViec hoặc noiLamViec đơn)
+      if (filters.danhSachNoiLamViec && filters.danhSachNoiLamViec.length > 0) {
+        if (!filters.danhSachNoiLamViec.includes(r.noiLamViec)) return false;
+      } else if (filters.noiLamViec && filters.noiLamViec !== 'ALL') {
         if (r.noiLamViec !== filters.noiLamViec) return false;
+      }
+
+      // 2b. Phòng khám tiếp nhận (Đa chọn danhSachPhongKham hoặc phongKham đơn)
+      if (filters.danhSachPhongKham && filters.danhSachPhongKham.length > 0) {
+        if (!filters.danhSachPhongKham.includes(r.khoaPhong)) return false;
+      } else if (filters.phongKham && filters.phongKham !== 'ALL') {
+        if (r.khoaPhong !== filters.phongKham) return false;
       }
 
       // 3. Trạng thái đối chiếu
@@ -219,6 +232,51 @@ export function App() {
         const denNum = parseDateToNumber(filters.denNgayDayHOC);
         if (tuNum && rHocNum < tuNum) return false;
         if (denNum && rHocNum > denNum) return false;
+      }
+
+      // 7. Bộ lọc theo từng cột tiêu đề của bảng chi tiết (Column Filters)
+      if (filters.columnFilters) {
+        for (const [colKey, selected] of Object.entries(filters.columnFilters)) {
+          if (!selected || selected.length === 0) continue;
+
+          if (colKey === 'maBA') {
+            const val = r.maBA || 'Chưa có BA';
+            if (!selected.includes(val)) return false;
+          } else if (colKey === 'hoTen') {
+            const val = r.hoTen || 'Chưa cập nhật tên';
+            if (!selected.includes(val)) return false;
+          } else if (colKey === 'noiLamViec') {
+            const val = r.noiLamViec || 'Khám tự do / Khác';
+            if (!selected.includes(val)) return false;
+          } else if (colKey === 'ngayKham') {
+            const d = extractDateOnly(r.ngayKham) || 'Chưa rõ ngày';
+            if (!selected.includes(d)) return false;
+          } else if (colKey === 'thoiDiemXuLyHOC') {
+            const d = extractDateOnly(r.thoiDiemXuLyHOC) || 'Chưa đẩy cổng';
+            if (!selected.includes(d)) return false;
+          } else if (colKey === 'maGiaoDich') {
+            const hasTrans = Boolean(r.maGiaoDich);
+            const isSelectedCo = selected.includes('CO_MA_GD');
+            const isSelectedChua = selected.includes('CHUA_CO_MA_GD');
+            if (isSelectedCo && !isSelectedChua && !hasTrans) return false;
+            if (isSelectedChua && !isSelectedCo && hasTrans) return false;
+          } else if (colKey === 'trangThaiHOC') {
+            if (!selected.includes(r.trangThaiDoiChieu) && !selected.includes(r.trangThaiHOC)) return false;
+          } else if (colKey === 'nhomLoi') {
+            const val = r.nhomLoi || (r.trangThaiHOC === 'Thành công' ? 'Hoàn thành (Không lỗi)' : 'Khác / Chưa có thông tin lỗi');
+            if (!selected.includes(val)) return false;
+          } else if (colKey === 'thongTinKhac') {
+            for (const crit of selected) {
+              if (crit === 'NAM' && r.gioiTinh !== 'Nam') return false;
+              if (crit === 'NU' && r.gioiTinh !== 'Nữ') return false;
+              if (crit === 'CO_CCCD' && !r.cccd) return false;
+              if (crit === 'CHUA_CCCD' && Boolean(r.cccd)) return false;
+              if (crit === 'CO_SDT' && !r.sdt) return false;
+              if (crit === 'CHUA_SDT' && Boolean(r.sdt)) return false;
+              if (crit.startsWith('PK:') && r.khoaPhong !== crit.replace('PK:', '')) return false;
+            }
+          }
+        }
       }
 
       return true;
@@ -276,6 +334,25 @@ export function App() {
       }));
     }
     setActiveTab('reconcile');
+  };
+
+  // Handler khi thay đổi bộ lọc trên từng cột tiêu đề của bảng
+  const handleColumnFilterChange = (colKey: string, selected: string[]) => {
+    setFilters(prev => ({
+      ...prev,
+      columnFilters: {
+        ...(prev.columnFilters || {}),
+        [colKey]: selected
+      }
+    }));
+  };
+
+  // Handler xóa toàn bộ các bộ lọc cột bảng
+  const handleClearAllColumnFilters = () => {
+    setFilters(prev => ({
+      ...prev,
+      columnFilters: {}
+    }));
   };
 
   return (
@@ -415,13 +492,19 @@ export function App() {
                   onFilterChange={(newF) => setFilters(prev => ({ ...prev, ...newF }))}
                   onResetFilters={() => setFilters(INITIAL_FILTERS)}
                   workplaces={stats.workplaceStats}
+                  clinics={stats.clinicStats}
                   errorGroups={stats.errorGroupStats}
                   totalRecords={baseRecords.length}
                   filteredCount={filteredRecords.length}
+                  onClearAllColumnFilters={handleClearAllColumnFilters}
                 />
 
                 <ReconcileDataTable
                   records={filteredRecords}
+                  baseRecords={baseRecords}
+                  columnFilters={filters.columnFilters}
+                  onColumnFilterChange={handleColumnFilterChange}
+                  onClearAllColumnFilters={handleClearAllColumnFilters}
                   onSelectRecord={(rec) => setSelectedRecord(rec)}
                 />
               </div>

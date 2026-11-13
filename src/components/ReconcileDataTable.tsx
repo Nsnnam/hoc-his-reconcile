@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -12,18 +12,29 @@ import {
   ChevronLeft, 
   ChevronRight,
   Sparkles,
-  ExternalLink
+  Filter,
+  X
 } from 'lucide-react';
 import { ReconciledRecord } from '../types';
+import { ColumnFilterPopup, ColumnFilterItem } from './ColumnFilterPopup';
+import { extractDateOnly } from '../utils/fileParser';
 
 interface ReconcileDataTableProps {
   records: ReconciledRecord[];
   onSelectRecord: (record: ReconciledRecord) => void;
+  baseRecords?: ReconciledRecord[];
+  columnFilters?: Record<string, string[]>;
+  onColumnFilterChange?: (colKey: string, selected: string[]) => void;
+  onClearAllColumnFilters?: () => void;
 }
 
 export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
   records,
-  onSelectRecord
+  onSelectRecord,
+  baseRecords,
+  columnFilters = {},
+  onColumnFilterChange,
+  onClearAllColumnFilters
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -32,6 +43,160 @@ export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
   const totalPages = Math.ceil(records.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
   const currentRecords = records.slice(startIndex, startIndex + pageSize);
+
+  // Nguồn dữ liệu để tính các giá trị phân loại cho từng cột
+  const sourceList = (baseRecords && baseRecords.length > 0) ? baseRecords : records;
+
+  // 1. Filter items cho Mã BA
+  const baFilterItems: ColumnFilterItem[] = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of sourceList) {
+      const val = r.maBA || 'Chưa có BA';
+      map.set(val, (map.get(val) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [sourceList]);
+
+  // 2. Filter items cho Họ tên
+  const nameFilterItems: ColumnFilterItem[] = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of sourceList) {
+      const val = r.hoTen || 'Chưa cập nhật tên';
+      map.set(val, (map.get(val) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [sourceList]);
+
+  // 3. Filter items cho Nơi làm việc
+  const workplaceFilterItems: ColumnFilterItem[] = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of sourceList) {
+      const val = r.noiLamViec || 'Khám tự do / Khác';
+      map.set(val, (map.get(val) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [sourceList]);
+
+  // 4. Filter items cho Ngày tiếp nhận (HIS)
+  const hisDateFilterItems: ColumnFilterItem[] = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of sourceList) {
+      const val = extractDateOnly(r.ngayKham) || 'Chưa rõ ngày';
+      map.set(val, (map.get(val) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [sourceList]);
+
+  // 5. Filter items cho Thời gian đẩy (HOC)
+  const hocDateFilterItems: ColumnFilterItem[] = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of sourceList) {
+      const val = extractDateOnly(r.thoiDiemXuLyHOC) || 'Chưa đẩy cổng';
+      map.set(val, (map.get(val) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [sourceList]);
+
+  // 6. Filter items cho Mã giao dịch (HIS)
+  const transFilterItems: ColumnFilterItem[] = useMemo(() => {
+    let coCount = 0;
+    let chuaCount = 0;
+    for (const r of sourceList) {
+      if (r.maGiaoDich) coCount++;
+      else chuaCount++;
+    }
+    return [
+      { value: 'CO_MA_GD', label: '✓ Đã có mã giao dịch (Đã đẩy)', count: coCount },
+      { value: 'CHUA_CO_MA_GD', label: '✕ Chưa có mã giao dịch', count: chuaCount }
+    ];
+  }, [sourceList]);
+
+  // 7. Filter items cho Trạng thái HOC & Đối chiếu
+  const statusFilterItems: ColumnFilterItem[] = useMemo(() => {
+    const counts: Record<string, number> = {
+      MATCH_SUCCESS: 0,
+      MATCH_FAILED: 0,
+      HIS_TRANS_NOT_IN_HOC: 0,
+      HIS_NO_TRANS: 0,
+      HOC_ONLY: 0
+    };
+    for (const r of sourceList) {
+      if (counts[r.trangThaiDoiChieu] !== undefined) {
+        counts[r.trangThaiDoiChieu]++;
+      }
+    }
+    return [
+      { value: 'MATCH_SUCCESS', label: '✅ Thành công (Khớp)', count: counts.MATCH_SUCCESS },
+      { value: 'MATCH_FAILED', label: '❌ HOC Báo lỗi', count: counts.MATCH_FAILED },
+      { value: 'HIS_TRANS_NOT_IN_HOC', label: '⏳ Đã gửi (Chờ HOC)', count: counts.HIS_TRANS_NOT_IN_HOC },
+      { value: 'HIS_NO_TRANS', label: '⚠️ Chưa có mã GD', count: counts.HIS_NO_TRANS },
+      { value: 'HOC_ONLY', label: '📋 Chỉ có trên HOC', count: counts.HOC_ONLY }
+    ].filter(item => item.count > 0);
+  }, [sourceList]);
+
+  // 8. Filter items cho Chi tiết lỗi / Nhóm lỗi
+  const errorFilterItems: ColumnFilterItem[] = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of sourceList) {
+      const val = r.nhomLoi || (r.trangThaiHOC === 'Thành công' ? 'Hoàn thành (Không lỗi)' : 'Khác / Chưa có thông tin lỗi');
+      map.set(val, (map.get(val) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [sourceList]);
+
+  // 9. Filter items cho Thông tin khác (Giới tính, CCCD, SĐT, Khoa phòng)
+  const otherFilterItems: ColumnFilterItem[] = useMemo(() => {
+    let nam = 0, nu = 0, coCccd = 0, chuaCccd = 0, coSdt = 0, chuaSdt = 0;
+    const pkMap = new Map<string, number>();
+
+    for (const r of sourceList) {
+      if (r.gioiTinh === 'Nam') nam++;
+      else if (r.gioiTinh === 'Nữ') nu++;
+
+      if (r.cccd) coCccd++;
+      else chuaCccd++;
+
+      if (r.sdt) coSdt++;
+      else chuaSdt++;
+
+      if (r.khoaPhong) {
+        pkMap.set(r.khoaPhong, (pkMap.get(r.khoaPhong) || 0) + 1);
+      }
+    }
+
+    const items: ColumnFilterItem[] = [
+      { value: 'NAM', label: 'Giới tính: Nam', count: nam },
+      { value: 'NU', label: 'Giới tính: Nữ', count: nu },
+      { value: 'CO_CCCD', label: 'Đã có CCCD', count: coCccd },
+      { value: 'CHUA_CCCD', label: 'Chưa có CCCD', count: chuaCccd },
+      { value: 'CO_SDT', label: 'Đã có SĐT', count: coSdt },
+      { value: 'CHUA_SDT', label: 'Chưa có SĐT', count: chuaSdt }
+    ];
+
+    for (const [pk, count] of pkMap.entries()) {
+      items.push({
+        value: `PK:${pk}`,
+        label: `🏥 ${pk}`,
+        count
+      });
+    }
+
+    return items.filter(it => it.count > 0);
+  }, [sourceList]);
+
+  const activeColumnCount = Object.values(columnFilters || {}).filter(arr => arr && arr.length > 0).length;
 
   const handleCopy = (text: string, id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -85,14 +250,26 @@ export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
       {/* Table Header Bar */}
       <div className="p-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60 text-xs">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center flex-wrap gap-2">
           <span className="font-bold text-slate-800">
             Bảng chi tiết đối chiếu ({records.length.toLocaleString()} hồ sơ)
           </span>
           <span className="text-slate-400">•</span>
-          <span className="text-slate-500">
-            Bấm vào hàng để xem chi tiết đối soát song song HIS ↔ HOC
+          <span className="text-slate-500 hidden sm:inline">
+            Tích chọn lọc tại từng tiêu đề cột hoặc bấm vào hàng để xem đối soát chi tiết
           </span>
+          {activeColumnCount > 0 && onClearAllColumnFilters && (
+            <button
+              type="button"
+              onClick={onClearAllColumnFilters}
+              className="inline-flex items-center space-x-1 bg-sky-100 text-sky-800 hover:bg-rose-100 hover:text-rose-700 px-2 py-0.5 rounded-full border border-sky-300 hover:border-rose-300 font-semibold text-[11px] transition-colors ml-1"
+              title="Nhấn để xóa toàn bộ các bộ lọc cột đang áp dụng"
+            >
+              <Filter className="w-3 h-3 text-sky-600 fill-current" />
+              <span>Đang lọc {activeColumnCount} cột • Bấm để xóa</span>
+              <X className="w-3 h-3" />
+            </button>
+          )}
         </div>
 
         {/* Page size selector */}
@@ -120,16 +297,130 @@ export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 uppercase tracking-wider font-semibold text-[11px] select-none sticky top-0 z-10">
+              {/* 1. STT */}
               <th className="py-2.5 px-3 w-12 text-center">STT</th>
-              <th className="py-2.5 px-3 w-28">Mã BA (Mã BN)</th>
-              <th className="py-2.5 px-3 w-40">Tên bệnh nhân</th>
-              <th className="py-2.5 px-3 w-44">Nơi làm việc</th>
-              <th className="py-2.5 px-3 w-36">Ngày tiếp nhận (HIS)</th>
-              <th className="py-2.5 px-3 w-36">Thời gian đẩy (HOC)</th>
-              <th className="py-2.5 px-3 w-44">Mã giao dịch (HIS)</th>
-              <th className="py-2.5 px-3 w-32 text-center">Trạng thái HOC</th>
-              <th className="py-2.5 px-3 w-60">Chi tiết lỗi & Phản hồi</th>
-              <th className="py-2.5 px-3 w-28 text-center">Thông tin khác</th>
+
+              {/* 2. Mã BA */}
+              <th className="py-2.5 px-3 w-32">
+                <div className="flex items-center justify-between">
+                  <span>Mã BA (BN)</span>
+                  <ColumnFilterPopup
+                    columnTitle="Mã BA"
+                    items={baFilterItems}
+                    selectedValues={columnFilters?.maBA || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('maBA', sel)}
+                  />
+                </div>
+              </th>
+
+              {/* 3. Tên bệnh nhân */}
+              <th className="py-2.5 px-3 w-40">
+                <div className="flex items-center justify-between">
+                  <span>Tên bệnh nhân</span>
+                  <ColumnFilterPopup
+                    columnTitle="Tên bệnh nhân"
+                    items={nameFilterItems}
+                    selectedValues={columnFilters?.hoTen || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('hoTen', sel)}
+                  />
+                </div>
+              </th>
+
+              {/* 4. Nơi làm việc */}
+              <th className="py-2.5 px-3 w-44">
+                <div className="flex items-center justify-between">
+                  <span>Nơi làm việc</span>
+                  <ColumnFilterPopup
+                    columnTitle="Nơi làm việc"
+                    items={workplaceFilterItems}
+                    selectedValues={columnFilters?.noiLamViec || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('noiLamViec', sel)}
+                  />
+                </div>
+              </th>
+
+              {/* 5. Ngày tiếp nhận (HIS) */}
+              <th className="py-2.5 px-3 w-36">
+                <div className="flex items-center justify-between">
+                  <span>Ngày TN (HIS)</span>
+                  <ColumnFilterPopup
+                    columnTitle="Ngày tiếp nhận (HIS)"
+                    items={hisDateFilterItems}
+                    selectedValues={columnFilters?.ngayKham || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('ngayKham', sel)}
+                  />
+                </div>
+              </th>
+
+              {/* 6. Thời gian đẩy (HOC) */}
+              <th className="py-2.5 px-3 w-36">
+                <div className="flex items-center justify-between">
+                  <span>Thời gian đẩy</span>
+                  <ColumnFilterPopup
+                    columnTitle="Thời gian đẩy (HOC)"
+                    items={hocDateFilterItems}
+                    selectedValues={columnFilters?.thoiDiemXuLyHOC || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('thoiDiemXuLyHOC', sel)}
+                  />
+                </div>
+              </th>
+
+              {/* 7. Mã giao dịch */}
+              <th className="py-2.5 px-3 w-40">
+                <div className="flex items-center justify-between">
+                  <span>Mã GD (HIS)</span>
+                  <ColumnFilterPopup
+                    columnTitle="Mã giao dịch"
+                    items={transFilterItems}
+                    selectedValues={columnFilters?.maGiaoDich || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('maGiaoDich', sel)}
+                  />
+                </div>
+              </th>
+
+              {/* 8. Trạng thái HOC */}
+              <th className="py-2.5 px-3 w-32 text-center">
+                <div className="flex items-center justify-center space-x-1">
+                  <span>Trạng thái HOC</span>
+                  <ColumnFilterPopup
+                    columnTitle="Trạng thái HOC"
+                    items={statusFilterItems}
+                    selectedValues={columnFilters?.trangThaiHOC || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('trangThaiHOC', sel)}
+                    align="right"
+                  />
+                </div>
+              </th>
+
+              {/* 9. Chi tiết lỗi & Phản hồi */}
+              <th className="py-2.5 px-3 w-60">
+                <div className="flex items-center justify-between">
+                  <span>Chi tiết lỗi & Phản hồi</span>
+                  <ColumnFilterPopup
+                    columnTitle="Chi tiết lỗi & Phản hồi"
+                    items={errorFilterItems}
+                    selectedValues={columnFilters?.nhomLoi || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('nhomLoi', sel)}
+                    align="right"
+                  />
+                </div>
+              </th>
+
+              {/* 10. Thông tin khác */}
+              <th className="py-2.5 px-3 w-28 text-center">
+                <div className="flex items-center justify-center space-x-1">
+                  <span>Thông tin khác</span>
+                  <ColumnFilterPopup
+                    columnTitle="Thông tin khác"
+                    items={otherFilterItems}
+                    selectedValues={columnFilters?.thongTinKhac || []}
+                    onFilterChange={(sel) => onColumnFilterChange?.('thongTinKhac', sel)}
+                    align="right"
+                  />
+                </div>
+              </th>
+
+              {/* 11. Xem chi tiết */}
               <th className="py-2.5 px-3 w-16 text-center">Chi tiết</th>
             </tr>
           </thead>
@@ -196,7 +487,7 @@ export const ReconcileDataTable: React.FC<ReconcileDataTableProps> = ({
                         </span>
                       </div>
                       {r.khoaPhong && (
-                        <div className="text-[10px] text-slate-400 truncate max-w-[170px]">
+                        <div className="text-[10px] text-slate-400 truncate max-w-[170px]" title={r.khoaPhong}>
                           {r.khoaPhong}
                         </div>
                       )}

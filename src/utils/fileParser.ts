@@ -88,8 +88,8 @@ export function formatDateTime(val: any): string {
     return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
   }
 
-  // 3. Khớp định dạng ngày/tháng/năm của HIS: dd/mm/yyyy hh:mm:ss
-  const vnMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/);
+  // 3. Khớp định dạng ngày/tháng/năm của HIS: dd/mm/yyyy hh:mm:ss hoặc dd-mm-yyyy hh:mm:ss
+  const vnMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/);
   if (vnMatch) {
     const [, d, m, y, hh, mm, ss] = vnMatch;
     const datePart = `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
@@ -264,7 +264,9 @@ export async function parseExcelFile(
   file: File | { name: string; size: number; arrayBuffer: () => Promise<ArrayBuffer> }
 ): Promise<UploadedFileRecord> {
   const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+  // Sử dụng raw: true để giữ nguyên chuỗi text gốc trong các file HTML .xls xuất từ VNPT HIS,
+  // tránh lỗi tự động parse ngày theo chuẩn Mỹ (MM/DD/YYYY) làm đảo ngược ngày 8/11 thành 11/8
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: false, raw: true });
   const firstSheetName = wb.SheetNames[0];
   const sheet = wb.Sheets[firstSheetName];
 

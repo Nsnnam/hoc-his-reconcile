@@ -1,4 +1,5 @@
 import {
+  ClinicStat,
   DateStat,
   ErrorGroupStat,
   ReconciledRecord,
@@ -137,6 +138,7 @@ export function performReconciliation(files: UploadedFileRecord[]): {
   errorGroupStats: ErrorGroupStat[];
   dateStats: DateStat[];
   hocDateStats: DateStat[];
+  clinicStats: ClinicStat[];
 } {
   // Bản đồ lưu trữ các bản ghi duy nhất
   const masterMap = new Map<string, ReconciledRecord>();
@@ -490,12 +492,13 @@ export function performReconciliation(files: UploadedFileRecord[]): {
     workplaceStats: stats.workplaceStats,
     errorGroupStats: stats.errorGroupStats,
     dateStats: stats.dateStats,
-    hocDateStats: stats.hocDateStats
+    hocDateStats: stats.hocDateStats,
+    clinicStats: stats.clinicStats
   };
 }
 
 /**
- * Tính toán nhanh các chỉ số thống kê tổng hợp (KPI, Nơi làm việc, Nhóm lỗi, Thời gian)
+ * Tính toán nhanh các chỉ số thống kê tổng hợp (KPI, Nơi làm việc, Phòng khám, Nhóm lỗi, Thời gian)
  * trên bất kỳ tập hồ sơ nào (Ví dụ: tập hồ sơ đã loại trừ các giao dịch mồ côi trên HOC)
  */
 export function computeSummaryStats(records: ReconciledRecord[]): {
@@ -504,6 +507,7 @@ export function computeSummaryStats(records: ReconciledRecord[]): {
   errorGroupStats: ErrorGroupStat[];
   dateStats: DateStat[];
   hocDateStats: DateStat[];
+  clinicStats: ClinicStat[];
 } {
   // Tính toán thống kê tổng hợp (Summary KPIs)
   const summary: SummaryStats = {
@@ -613,11 +617,23 @@ export function computeSummaryStats(records: ReconciledRecord[]): {
     type: 'NGAY_DAY_HOC' as const
   })).sort((a, b) => (parseDateToNumber(b.ngay) || 0) - (parseDateToNumber(a.ngay) || 0));
 
+  // Thống kê theo Phòng khám (Clinic Stats)
+  const clinicMap = new Map<string, number>();
+  for (const r of records) {
+    const pk = r.khoaPhong || 'Chưa phân phòng khám';
+    clinicMap.set(pk, (clinicMap.get(pk) || 0) + 1);
+  }
+  const clinicStats: ClinicStat[] = Array.from(clinicMap.entries()).map(([phongKham, count]) => ({
+    phongKham,
+    count
+  })).sort((a, b) => b.count - a.count);
+
   return {
     summary,
     workplaceStats,
     errorGroupStats,
     dateStats,
-    hocDateStats
+    hocDateStats,
+    clinicStats
   };
 }

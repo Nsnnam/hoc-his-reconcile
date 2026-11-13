@@ -8,19 +8,23 @@ import {
   Calendar,
   Clock,
   Sparkles,
+  Stethoscope,
   X
 } from 'lucide-react';
-import { FilterCriteria, WorkplaceStat, ErrorGroupStat } from '../types';
+import { FilterCriteria, WorkplaceStat, ClinicStat, ErrorGroupStat } from '../types';
 import { toInputDateValue, fromInputDateValue } from '../utils/fileParser';
+import { MultiSelectDropdown, MultiSelectOption } from './MultiSelectDropdown';
 
 interface FilterToolbarProps {
   filters: FilterCriteria;
   onFilterChange: (newFilters: Partial<FilterCriteria>) => void;
   onResetFilters: () => void;
   workplaces: WorkplaceStat[];
+  clinics: ClinicStat[];
   errorGroups: ErrorGroupStat[];
   totalRecords: number;
   filteredCount: number;
+  onClearAllColumnFilters?: () => void;
 }
 
 interface DatePickerFieldProps {
@@ -75,20 +79,41 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
   onFilterChange,
   onResetFilters,
   workplaces,
+  clinics,
   errorGroups,
   totalRecords,
-  filteredCount
+  filteredCount,
+  onClearAllColumnFilters
 }) => {
+  const activeColumnCount = Object.values(filters.columnFilters || {}).filter(arr => arr && arr.length > 0).length;
+
   const hasActiveFilters = 
     Boolean(filters.searchTerm) ||
     filters.noiLamViec !== 'ALL' ||
+    (filters.danhSachNoiLamViec && filters.danhSachNoiLamViec.length > 0) ||
+    (filters.danhSachPhongKham && filters.danhSachPhongKham.length > 0) ||
     filters.trangThaiDoiChieu !== 'ALL' ||
     filters.nhomLoi !== 'ALL' ||
     Boolean(filters.tuNgayKham) ||
     Boolean(filters.denNgayKham) ||
     Boolean(filters.tuNgayDayHOC) ||
     Boolean(filters.denNgayDayHOC) ||
-    !filters.chiLayHoSoHIS;
+    !filters.chiLayHoSoHIS ||
+    activeColumnCount > 0;
+
+  // Options cho Nơi làm việc (Doanh nghiệp, cơ quan)
+  const workplaceOptions: MultiSelectOption[] = workplaces.map(w => ({
+    value: w.noiLamViec,
+    label: w.noiLamViec,
+    count: w.total
+  }));
+
+  // Options cho Phòng khám tiếp nhận
+  const clinicOptions: MultiSelectOption[] = clinics.map(c => ({
+    value: c.phongKham,
+    label: c.phongKham,
+    count: c.count
+  }));
 
   return (
     <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
@@ -125,17 +150,17 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
         </div>
       </div>
 
-      {/* Search & Main Row */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+      {/* Main Filter Row: Search, Multi-workplace, Multi-clinic, Status, Error group */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
         {/* Global Search Bar */}
-        <div className="md:col-span-5 relative">
+        <div className="lg:col-span-4 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
-            placeholder="Tìm theo Mã BA (BAxxxx), Mã BN, Họ tên, CCCD, Mã giao dịch..."
+            placeholder="Tìm Mã BA, Mã BN, Họ tên, CCCD, Mã GD..."
             value={filters.searchTerm}
             onChange={(e) => onFilterChange({ searchTerm: e.target.value })}
-            className="w-full pl-9 pr-9 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all font-medium"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all font-medium"
           />
           {filters.searchTerm && (
             <button
@@ -148,64 +173,72 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
           )}
         </div>
 
-        {/* Nơi làm việc Filter */}
-        <div className="md:col-span-3">
-          <div className="relative">
-            <Building2 className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
-            <select
-              value={filters.noiLamViec}
-              onChange={(e) => onFilterChange({ noiLamViec: e.target.value })}
-              className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white text-slate-700"
-            >
-              <option value="ALL">🏢 Tất cả nơi làm việc ({workplaces.length})</option>
-              {workplaces.map((w) => (
-                <option key={w.noiLamViec} value={w.noiLamViec}>
-                  {w.noiLamViec} ({w.total.toLocaleString()} ca)
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Nơi làm việc (Doanh nghiệp, cơ quan) - Multi-Select với Checkboxes */}
+        <div className="lg:col-span-3">
+          <MultiSelectDropdown
+            label="Nơi làm việc / Doanh nghiệp"
+            icon={<Building2 className="w-3.5 h-3.5 text-teal-600" />}
+            options={workplaceOptions}
+            selectedValues={filters.danhSachNoiLamViec || []}
+            onChange={(sel) => onFilterChange({ danhSachNoiLamViec: sel, noiLamViec: 'ALL' })}
+            placeholder="🏢 Nơi làm việc"
+            badgeColor="bg-teal-100 text-teal-800"
+          />
+        </div>
+
+        {/* Phòng khám tiếp nhận - Multi-Select với Checkboxes */}
+        <div className="lg:col-span-3">
+          <MultiSelectDropdown
+            label="Phòng khám tiếp nhận"
+            icon={<Stethoscope className="w-3.5 h-3.5 text-indigo-600" />}
+            options={clinicOptions}
+            selectedValues={filters.danhSachPhongKham || []}
+            onChange={(sel) => onFilterChange({ danhSachPhongKham: sel, phongKham: 'ALL' })}
+            placeholder="🏥 Phòng khám"
+            badgeColor="bg-indigo-100 text-indigo-800"
+          />
         </div>
 
         {/* Trạng thái Đối chiếu Filter */}
-        <div className="md:col-span-2">
+        <div className="lg:col-span-2">
           <select
             value={filters.trangThaiDoiChieu}
             onChange={(e) => onFilterChange({ trangThaiDoiChieu: e.target.value })}
             className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white text-slate-700 font-medium"
           >
-            <option value="ALL">🔍 Mọi trạng thái đối chiếu</option>
+            <option value="ALL">🔍 Mọi trạng thái</option>
             <option value="MATCH_SUCCESS">✅ HOC Thành công</option>
-            <option value="MATCH_FAILED">❌ HOC Thất bại / Lỗi</option>
-            <option value="HIS_NO_TRANS">⏳ Chưa có mã GD HIS</option>
+            <option value="MATCH_FAILED">❌ HOC Báo lỗi</option>
+            <option value="HIS_NO_TRANS">⏳ Chưa có mã GD</option>
             <option value="HIS_TRANS_NOT_IN_HOC">⚠️ Đã gửi, chờ HOC</option>
             {!filters.chiLayHoSoHIS && (
-              <option value="HOC_ONLY">📋 Chỉ có trên HOC (Dư / Không khớp HIS)</option>
+              <option value="HOC_ONLY">📋 Chỉ có trên HOC (Dư)</option>
             )}
-          </select>
-        </div>
-
-        {/* Nhóm lỗi Filter */}
-        <div className="md:col-span-2">
-          <select
-            value={filters.nhomLoi}
-            onChange={(e) => onFilterChange({ nhomLoi: e.target.value })}
-            className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white text-slate-700"
-          >
-            <option value="ALL">⚠️ Nhóm lỗi vi phạm (Tất cả)</option>
-            {errorGroups.map((err) => (
-              <option key={err.nhomLoi} value={err.nhomLoi}>
-                {err.nhomLoi} ({err.count} ca)
-              </option>
-            ))}
           </select>
         </div>
       </div>
 
-      {/* Second Row: Date Filters & Status Counter */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
-        {/* Date Filter & Active Filter Tags */}
-        <div className="flex flex-wrap items-center gap-3">
+      {/* Second Row: Date Filters, Error Group, Column Filter Badge & Counter */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-100 text-xs">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Nhóm lỗi Filter */}
+          <div className="w-48">
+            <select
+              value={filters.nhomLoi}
+              onChange={(e) => onFilterChange({ nhomLoi: e.target.value })}
+              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white text-slate-700"
+            >
+              <option value="ALL">⚠️ Nhóm lỗi vi phạm (Tất cả)</option>
+              {errorGroups.map((err) => (
+                <option key={err.nhomLoi} value={err.nhomLoi}>
+                  {err.nhomLoi} ({err.count} ca)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <span className="text-slate-300 hidden sm:inline">|</span>
+
           {/* HIS Date */}
           <div className="flex items-center space-x-1.5 bg-emerald-50/60 py-1 px-2 rounded-lg border border-emerald-100">
             <span className="text-emerald-800 flex items-center gap-1 font-semibold text-[11px]">
@@ -250,11 +283,29 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             />
           </div>
 
+          {/* Column filter indicator tag */}
+          {activeColumnCount > 0 && (
+            <div className="inline-flex items-center space-x-1 bg-sky-100 text-sky-800 px-2 py-1 rounded-lg border border-sky-300 font-medium text-[11px]">
+              <Filter className="w-3 h-3 text-sky-600 fill-current" />
+              <span>Đang lọc {activeColumnCount} cột tiêu đề</span>
+              {onClearAllColumnFilters && (
+                <button
+                  type="button"
+                  onClick={onClearAllColumnFilters}
+                  className="ml-1 text-sky-700 hover:text-rose-600 font-bold"
+                  title="Xóa bộ lọc trên các cột bảng"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
+
           {hasActiveFilters && (
             <button
               type="button"
               onClick={onResetFilters}
-              className="inline-flex items-center space-x-1 px-2.5 py-1 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded border border-rose-200 transition-colors font-medium ml-1"
+              className="inline-flex items-center space-x-1 px-2.5 py-1 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors font-medium ml-1 shadow-2xs"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Xóa bộ lọc</span>

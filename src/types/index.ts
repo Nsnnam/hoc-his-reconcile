@@ -99,9 +99,17 @@ export interface DateStat {
   type?: 'NGAY_TIEP_NHAN' | 'NGAY_DAY_HOC';
 }
 
+export interface ClinicStat {
+  phongKham: string;
+  count: number;
+}
+
 export interface FilterCriteria {
   searchTerm: string; // BA, BN, Họ tên, CCCD, Mã GD
   noiLamViec: string;
+  danhSachNoiLamViec: string[]; // Danh sách các nơi làm việc được chọn (Rỗng = Tất cả)
+  phongKham: string;
+  danhSachPhongKham: string[]; // Danh sách các phòng khám tiếp nhận được chọn (Rỗng = Tất cả)
   trangThaiDoiChieu: string; // 'ALL' | ReconcileStatus
   trangThaiHOC: string; // 'ALL' | 'Thành công' | 'Thất bại' | 'Chưa đồng bộ'
   trangThaiHIS: string; // 'ALL' | 'HAS_TRANS' | 'NO_TRANS'
@@ -111,6 +119,7 @@ export interface FilterCriteria {
   tuNgayDayHOC: string; // Ngày đẩy lên cổng (HOC)
   denNgayDayHOC: string;
   chiLayHoSoHIS: boolean; // Mặc định TRUE: Chỉ rà & lấy hồ sơ thuộc tệp HIS (chưa đẩy + đã đẩy khớp mã GD cột K). Bỏ qua Transaction ID chỉ có trên HOC.
+  columnFilters: Record<string, string[]>; // Bộ lọc theo từng cột tiêu đề của bảng chi tiết (colKey -> mảng giá trị được chọn)
 }
 
 export interface PortalLink {
